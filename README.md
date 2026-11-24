@@ -2,6 +2,15 @@
 
 Checks Python folders for published indicators of the agent-framework credential stealer.
 
+## About
+
+**Secure Data Solutions (SDS)**, https://sdsitgroup.com  
+The engineers other security teams call when it has to work.
+
+We build free tools like this for cyber defenders. Our programs cover threat exposure, defensible security, and validated resilience: we find what attackers can reach, shut it down, and prove it holds.
+
+Ran this and found something, or not sure what you're looking at? Drop us a line at https://sdsitgroup.com. We're happy to talk it through, and when it's urgent, we pick up.
+
 Read the script first. [pth_check.py](pth_check.py)
 
 Requires Python 3.8 or later. Use a trusted Python installation. Keep `-I -B -S` in the command so Python ignores user startup settings, does not write bytecode, and does not run `.pth` hooks before the check.
