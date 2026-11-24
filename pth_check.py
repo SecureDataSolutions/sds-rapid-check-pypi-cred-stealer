@@ -61,13 +61,14 @@ SKIP_DIRS = {".git", "node_modules"}
 SITE_NAMES = ("site-packages", "dist-packages")
 
 
-def sha256(path):
+def sha256(path, report_error):
     h = hashlib.sha256()
     try:
         with open(path, "rb") as f:
             for block in iter(lambda: f.read(1 << 20), b""):
                 h.update(block)
-    except OSError:
+    except OSError as e:
+        report_error(f"could not hash {path} ({e})")
         return None
     return h.hexdigest()
 
@@ -146,7 +147,7 @@ def main():
             path = os.path.join(d, *name.split("/"))
             if not os.path.isfile(path):
                 continue
-            same = sha256(path) == digest
+            same = sha256(path, report_error) == digest
             if not same and name.endswith("/__init__.py"):
                 continue  # The clean package ships a file at this path too.
             why = "fingerprint matches" if same else "indicator file name matches"
@@ -176,7 +177,7 @@ def main():
                         print(f"      {line[:120]}")
 
     for path in wheels:
-        ver = BAD_WHEELS.get(sha256(path) or "")
+        ver = BAD_WHEELS.get(sha256(path, report_error))
         why = f"fingerprint matches the bad {ver} wheel" if ver else "bad version number in the file name"
         print(f"!! BAD DOWNLOAD ({why}): {path}")
         flagged += 1
