@@ -4,46 +4,115 @@ Checks Python folders for published indicators of the agent-framework credential
 
 ## About
 
-**Secure Data Solutions (SDS)**, https://sdsitgroup.com  
-The engineers other security teams call when it has to work.
+**Secure Data Solutions (SDS)**, https://sdsitgroup.com
 
-We build free tools like this for cyber defenders. Our programs cover threat exposure, defensible security, and validated resilience: we find what attackers can reach, shut it down, and prove it holds.
+Secure Data Solutions (SDS) is a network and firewall security company. We are the engineering team other security teams call when it has to work.
 
-Ran this and found something, or not sure what you're looking at? Drop us a line at https://sdsitgroup.com. We're happy to talk it through, and when it's urgent, we pick up.
+Our programs cover threat exposure, defensible security, and validated resilience: we find what attackers can reach, shut it down, and prove it holds. We also publish free checks like this one for cyber defenders.
+
+Start with one fixed-scope check, or see [all services and pricing](https://sdsitgroup.com/services/). [Discuss your project](https://sdsitgroup.com/contact).
+
+Ran this and found something, or not sure what you're looking at? [Contact us](https://sdsitgroup.com/contact). We're happy to talk it through, and when it's urgent, we pick up.
 
 Read the script first. [pth_check.py](pth_check.py)
 
 Requires Python 3.8 or later. Use a trusted Python installation. Keep `-I -B -S` in the command so Python ignores user startup settings, does not write bytecode, and does not run `.pth` hooks before the check.
 
-## macOS
+## How to run
+
+The script always scans the site-packages of the Python that runs it, then walks the folders you name (or `.` for the current folder). It stops at each `site-packages` or `dist-packages` folder it finds, and skips only `.git` and `node_modules`. If you run it from `~/.ssh` and pass `.`, it only walks that folder — not your whole home directory.
+
+### 1. Go to your home folder
+
+```sh
+cd ~
+```
+
+Do this first for two reasons: the script and checksum file are downloaded into the current directory, and the folders you name are what it walks. Running from your home folder, then passing `$HOME`, checks your home directory even if you later change directories.
+
+### 2. Download the script and the checksum file
 
 ```sh
 base='https://github.com/SecureDataSolutions/sds-rapid-check-pypi-cred-stealer/releases/latest/download'
-curl -fsSLo pth_check.py "$base/pth_check.py" &&
-curl -fsSLo SHA256SUMS "$base/SHA256SUMS" &&
-shasum -a 256 -c SHA256SUMS &&
-python3 -I -B -S pth_check.py .
+curl -fsSLo pth_check.py "$base/pth_check.py"
+curl -fsSLo SHA256SUMS "$base/SHA256SUMS"
 ```
 
-Replace `.` with the directories you want checked. To check only this Python's site-packages, omit the directory argument.
+If you skip this step, Python will fail with `can't open file '.../pth_check.py'`.
 
-## Linux
+### 3. Verify the SHA-256 before you run anything
+
+We publish a SHA-256 checksum for `pth_check.py` in `SHA256SUMS`. The next command matches the file you downloaded against that published checksum.
+
+On macOS:
 
 ```sh
-base='https://github.com/SecureDataSolutions/sds-rapid-check-pypi-cred-stealer/releases/latest/download'
-curl -fsSLo pth_check.py "$base/pth_check.py" &&
-curl -fsSLo SHA256SUMS "$base/SHA256SUMS" &&
-sha256sum -c SHA256SUMS &&
-python3 -I -B -S pth_check.py .
+shasum -a 256 -c SHA256SUMS
 ```
 
-Replace `.` with the directories you want checked. To check only this Python's site-packages, omit the directory argument.
+On Linux:
+
+```sh
+sha256sum -c SHA256SUMS
+```
+
+It must print `pth_check.py: OK`. In the copy-paste command below, `&&` means the script never runs if the checksum does not match. Do not skip this step, and do not run the script if verification fails.
+
+### 4. Run the check
+
+```sh
+python3 -I -B -S pth_check.py "$HOME"
+```
+
+What the flags do:
+
+- `-I` isolates Python from user site packages and environment settings that could change startup.
+- `-B` stops Python from writing `.pyc` bytecode files.
+- `-S` skips the `site` module so `.pth` hooks do not run before the check.
+
+You can name more folders if Python environments live outside your home directory, for example a Homebrew prefix, conda environment directories, or `/usr/local`:
+
+```sh
+python3 -I -B -S pth_check.py "$HOME" /opt/homebrew /usr/local
+```
+
+Do not pass a whole conda or Anaconda root. The `pkgs/` cache will inflate the counts. Pass the `envs` directory, or individual environment folders, instead.
+
+### 5. How long it takes
+
+A scan of a typical home folder takes about 12 minutes. Cloud or phone mounts can make it slower. Smaller folders finish much faster.
+
+### 6. How to read the output
+
+- `hook:` lines are `.pth` files with executable lines. Most are normal (setuptools, virtualenv, editable installs). The script lists them for review; a hook line is not a finding by itself.
+- `!!` lines are flagged findings: a published indicator of the bad releases. Those need attention.
+- The summary reports how many site-packages folders, `.pth` files, and lock or requirements files were checked, and how many were flagged (`Flagged (!!):`).
+- `Scan incomplete: N read or parse error(s)` means the script could not read some paths. That is common with cloud and phone mounts (for example macOS `~/Library/CloudStorage/`, including phone mounts such as MacDroid) and with folders that return "Permission denied." Those errors are not findings. You can ignore errors from mounts you did not intend to scan, or rerun and name only the folders you want so those mounts are left out.
+
+### 7. Copy-paste command (macOS and Linux)
+
+This is a single line. It changes to your home folder, downloads both files, verifies the checksum, and only then runs the check. If verification does not print `pth_check.py: OK`, the script does not run.
+
+macOS:
+
+```sh
+cd ~ && base='https://github.com/SecureDataSolutions/sds-rapid-check-pypi-cred-stealer/releases/latest/download' && curl -fsSLo pth_check.py "$base/pth_check.py" && curl -fsSLo SHA256SUMS "$base/SHA256SUMS" && shasum -a 256 -c SHA256SUMS && python3 -I -B -S pth_check.py "$HOME"
+```
+
+Linux:
+
+```sh
+cd ~ && base='https://github.com/SecureDataSolutions/sds-rapid-check-pypi-cred-stealer/releases/latest/download' && curl -fsSLo pth_check.py "$base/pth_check.py" && curl -fsSLo SHA256SUMS "$base/SHA256SUMS" && sha256sum -c SHA256SUMS && python3 -I -B -S pth_check.py "$HOME"
+```
 
 ## Windows (PowerShell)
+
+The same rules apply: download both files, verify the published SHA-256, and only then run the script. If the checksum does not match, the commands below throw an error and the script never runs.
 
 ```powershell
 & {
 $ErrorActionPreference = 'Stop'
+Set-Location $HOME
 $base = 'https://github.com/SecureDataSolutions/sds-rapid-check-pypi-cred-stealer/releases/latest/download'
 Invoke-WebRequest "$base/pth_check.py" -OutFile .\pth_check.py
 Invoke-WebRequest "$base/SHA256SUMS" -OutFile .\SHA256SUMS
@@ -52,11 +121,11 @@ if ($entries.Count -ne 1) { throw 'Expected one SHA-256 entry for pth_check.py' 
 $expected = $entries[0].Substring(0, 64).ToLowerInvariant()
 $actual = (Get-FileHash .\pth_check.py -Algorithm SHA256).Hash.ToLowerInvariant()
 if ($actual -ne $expected) { throw 'pth_check.py SHA-256 verification failed' }
-  py -3 -I -B -S .\pth_check.py .
+  py -3 -I -B -S .\pth_check.py $HOME
 }
 ```
 
-Replace `.` with the directories you want checked. To check only this Python's site-packages, omit the directory argument.
+To check only this Python's site-packages, omit the directory argument. You can also name additional folders after `$HOME`.
 
 ## What a result means
 
@@ -76,6 +145,6 @@ No finding is not proof of no compromise.
 
 The AI Coding Tool Check covers up to five developer machines and one build pipeline. The fixed price is $1,250 for the first three teams.
 
-[Contact form](https://sdsitgroup.com/contact) · [Services](https://sdsitgroup.com/#services)
+[Discuss your project](https://sdsitgroup.com/contact) · [All services and pricing](https://sdsitgroup.com/services/)
 
 Run only on systems you own or are authorized to check. Licensed under the MIT License.
