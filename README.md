@@ -2,6 +2,61 @@
 
 Checks Python folders for published indicators of the agent-framework credential stealer.
 
+**Who this is for.** Python developers, IT admins and MSP technicians investigating a workstation or build runner. You need terminal access and permission to read its Python environments. If someone manages your laptop for you, send them this check.
+
+## Before you run it
+
+Use a Python 3.8+ interpreter from a source you trust. A suspicious project's virtual environment can stay inactive: the check reads its files using the interpreter you choose. The uppercase flags matter: `-I` isolates startup, `-B` prevents bytecode writes, and `-S` skips the startup step that would normally execute package hooks.
+
+If you suspect the interpreter or host itself has been altered, use a separate trusted machine and inspect a read-only copy or mounted image of the suspect files. A new virtual environment on the suspect host uses its underlying Python. The release checksum verifies the downloaded script against the published digest; it cannot establish trust in the machine running it. [Read the v0.1.0 script](https://github.com/SecureDataSolutions/sds-rapid-check-pypi-cred-stealer/blob/v0.1.0/pth_check.py).
+
+## How to run
+
+**macOS and Linux.** From a shell where `python3` resolves to your trusted interpreter, paste the whole block. It keeps both downloads in a dedicated **PyPI Checks** folder and runs the check after checksum verification. This first pass covers the package directories associated with that interpreter, including its existing user package directory.
+
+```sh
+mkdir -p "$HOME/PyPI Checks" && cd "$HOME/PyPI Checks" && base='https://github.com/SecureDataSolutions/sds-rapid-check-pypi-cred-stealer/releases/download/v0.1.0' &&
+curl -fsSLo pth_check.py "$base/pth_check.py" &&
+curl -fsSLo SHA256SUMS "$base/SHA256SUMS" &&
+if command -v sha256sum >/dev/null; then sha256sum -c SHA256SUMS; else shasum -a 256 -c SHA256SUMS; fi && python3 -I -B -S pth_check.py
+```
+
+**Windows (PowerShell).** Use this block when `py -3` selects a trusted interpreter. If you have a designated interpreter, use its full path with PowerShell's call operator (`&`) in the final command.
+
+```powershell
+& {
+$ErrorActionPreference = 'Stop'
+$checkDir = Join-Path $HOME 'PyPI Checks'
+New-Item -ItemType Directory -Force -Path $checkDir | Out-Null
+Set-Location -LiteralPath $checkDir
+$base = 'https://github.com/SecureDataSolutions/sds-rapid-check-pypi-cred-stealer/releases/download/v0.1.0'
+Invoke-WebRequest "$base/pth_check.py" -OutFile .\pth_check.py
+Invoke-WebRequest "$base/SHA256SUMS" -OutFile .\SHA256SUMS
+$entries = @(Get-Content .\SHA256SUMS | Where-Object { $_ -match '^([0-9a-fA-F]{64})  pth_check\.py$' })
+if ($entries.Count -ne 1) { throw 'Expected one SHA-256 entry for pth_check.py' }
+$expected = $entries[0].Substring(0, 64).ToLowerInvariant()
+$actual = (Get-FileHash .\pth_check.py -Algorithm SHA256).Hash.ToLowerInvariant()
+if ($actual -ne $expected) { throw 'pth_check.py SHA-256 verification failed' }
+py -3 -I -B -S .\pth_check.py
+}
+```
+
+## Find and check other environments
+
+A machine can have dozens of Python environments. You only need one trusted interpreter to inspect them. The folder containing the downloaded script is independent of the folders you ask it to inspect.
+
+1. **Locate installations and environments.** On macOS/Linux, `type -a python3` lists candidates on your shell path. On Windows, `where.exe python` lists path matches and `py -0p` lists runtimes known to the launcher where supported. Include environments outside the shell path: project-local virtual environments, pyenv versions, Conda environments, and CI workspace or runner directories. Use `conda env list` if your Conda installation is trusted.
+2. **Look on disk without starting the discovered interpreters.** For example, from a macOS/Linux project directory, run `find . -type f -name pyvenv.cfg -print`. On Windows, use `Get-ChildItem -Path . -Recurse -Force -Filter pyvenv.cfg -File` from the project directory. These markers identify standard virtual environments within that tree. Check other users, volumes, containers and build runners separately where authorized.
+3. **Pass the actual roots.** From **PyPI Checks**, append one or more paths to the verified command. For example, if your projects live in `~/projects`, run `python3 -I -B -S pth_check.py "$HOME/projects"`. On Windows, if your environments live under `D:\envs`, run `py -3 -I -B -S .\pth_check.py 'D:\envs'`. Use the actual environment directories for Conda to avoid counting cached packages. The check looks for package directories, supported lock files and wheels under the paths supplied.
+4. **Account for coverage.** Record the roots you supplied and any unreadable or unavailable paths. The summary counts package directories, not distinct interpreters. For a mounted image, distinguish findings on the mounted paths from the analysis machine's own package directories, which the script also includes.
+
+## Read the result
+
+- **`!!`** flags a known indicator. The path and message distinguish an installed file or version from a downloaded wheel or a dependency pin.
+- **`hook:`** lists executable startup lines for review. Legitimate packages use these too.
+- **`Scan incomplete`** identifies a coverage gap. Review the reported errors even when the flagged count is zero.
+- **Zero flagged** means the check found none of its published indicators in the files it could examine.
+
 ## About SDS
 
 **Security, AI & Systems Engineering**
@@ -13,125 +68,6 @@ We publish SDS Rapid Checks as free, focused tools to help the community investi
 [Discuss your project](https://sdsitgroup.com/contact) · [Explore our services](https://sdsitgroup.com/services/)
 
 Ran this and found something, or not sure what you're looking at? [Contact us](https://sdsitgroup.com/contact). We're happy to talk it through, and when it's urgent, we pick up.
-
-Read the script first. [pth_check.py](pth_check.py)
-
-Requires Python 3.8 or later. Use a trusted Python installation. Keep `-I -B -S` in the command so Python ignores user startup settings, does not write bytecode, and does not run `.pth` hooks before the check.
-
-## How to run
-
-The script always scans the site-packages of the Python that runs it, then walks only the additional folders you name. Pass `.` to walk the current folder; omit directory arguments to check only this Python's site-packages. It stops at each `site-packages` or `dist-packages` folder it finds, and skips only `.git` and `node_modules`. If you run it from `~/.ssh` and pass `.`, it only walks that folder — not your whole home directory.
-
-### 1. Go to your home folder
-
-```sh
-cd ~
-```
-
-Do this first for two reasons: the script and checksum file are downloaded into the current directory, and the folders you name are what it walks. Running from your home folder, then passing `$HOME`, checks your home directory even if you later change directories.
-
-### 2. Download the script and the checksum file
-
-```sh
-base='https://github.com/SecureDataSolutions/sds-rapid-check-pypi-cred-stealer/releases/latest/download'
-curl -fsSLo pth_check.py "$base/pth_check.py"
-curl -fsSLo SHA256SUMS "$base/SHA256SUMS"
-```
-
-If you skip this step, Python will fail with `can't open file '.../pth_check.py'`.
-
-### 3. Verify the SHA-256 before you run anything
-
-We publish a SHA-256 checksum for `pth_check.py` in `SHA256SUMS`. The next command matches the file you downloaded against that published checksum.
-
-On macOS:
-
-```sh
-shasum -a 256 -c SHA256SUMS
-```
-
-On Linux:
-
-```sh
-sha256sum -c SHA256SUMS
-```
-
-It must print `pth_check.py: OK`. In the copy-paste command below, `&&` means the script never runs if the checksum does not match. Do not skip this step, and do not run the script if verification fails.
-
-### 4. Run the check
-
-```sh
-python3 -I -B -S pth_check.py "$HOME"
-```
-
-What the flags do:
-
-- `-I` isolates Python from user site packages and environment settings that could change startup.
-- `-B` stops Python from writing `.pyc` bytecode files.
-- `-S` skips the `site` module so `.pth` hooks do not run before the check.
-
-You can name more folders if Python environments live outside your home directory, for example a Homebrew prefix, conda environment directories, or `/usr/local`:
-
-```sh
-python3 -I -B -S pth_check.py "$HOME" /opt/homebrew /usr/local
-```
-
-Do not pass a whole conda or Anaconda root. The `pkgs/` cache will inflate the counts. Pass the `envs` directory, or individual environment folders, instead.
-
-### 5. How long it takes
-
-Runtime depends on the number of folders and files, permissions, and storage speed. Cloud or phone mounts can make it slower. Start with the specific folders you need to check.
-
-### 6. How to read the output
-
-- `hook:` lines are `.pth` files with executable lines. Most are normal (setuptools, virtualenv, editable installs). The script lists them for review; a hook line is not a finding by itself.
-- `!!` lines are flagged findings: a published indicator of the bad releases. Those need attention.
-- The summary reports how many site-packages folders, `.pth` files, and lock or requirements files were checked, and how many were flagged (`Flagged (!!):`).
-- `Scan incomplete: N read or parse error(s)` means the script could not read some paths. That is common with cloud and phone mounts (for example macOS `~/Library/CloudStorage/`, including phone mounts such as MacDroid) and with folders that return "Permission denied." Those errors are not findings. You can ignore errors from mounts you did not intend to scan, or rerun and name only the folders you want so those mounts are left out.
-
-### 7. Copy-paste command (macOS and Linux)
-
-This is a single line. It changes to your home folder, downloads both files, verifies the checksum, and only then runs the check. If verification does not print `pth_check.py: OK`, the script does not run.
-
-macOS:
-
-```sh
-cd ~ && base='https://github.com/SecureDataSolutions/sds-rapid-check-pypi-cred-stealer/releases/latest/download' && curl -fsSLo pth_check.py "$base/pth_check.py" && curl -fsSLo SHA256SUMS "$base/SHA256SUMS" && shasum -a 256 -c SHA256SUMS && python3 -I -B -S pth_check.py "$HOME"
-```
-
-Linux:
-
-```sh
-cd ~ && base='https://github.com/SecureDataSolutions/sds-rapid-check-pypi-cred-stealer/releases/latest/download' && curl -fsSLo pth_check.py "$base/pth_check.py" && curl -fsSLo SHA256SUMS "$base/SHA256SUMS" && sha256sum -c SHA256SUMS && python3 -I -B -S pth_check.py "$HOME"
-```
-
-## Windows (PowerShell)
-
-The same rules apply: download both files, verify the published SHA-256, and only then run the script. If the checksum does not match, the commands below throw an error and the script never runs.
-
-```powershell
-& {
-$ErrorActionPreference = 'Stop'
-Set-Location $HOME
-$base = 'https://github.com/SecureDataSolutions/sds-rapid-check-pypi-cred-stealer/releases/latest/download'
-Invoke-WebRequest "$base/pth_check.py" -OutFile .\pth_check.py
-Invoke-WebRequest "$base/SHA256SUMS" -OutFile .\SHA256SUMS
-$entries = @(Get-Content .\SHA256SUMS | Where-Object { $_ -match '^([0-9a-fA-F]{64})  pth_check\.py$' })
-if ($entries.Count -ne 1) { throw 'Expected one SHA-256 entry for pth_check.py' }
-$expected = $entries[0].Substring(0, 64).ToLowerInvariant()
-$actual = (Get-FileHash .\pth_check.py -Algorithm SHA256).Hash.ToLowerInvariant()
-if ($actual -ne $expected) { throw 'pth_check.py SHA-256 verification failed' }
-  py -3 -I -B -S .\pth_check.py $HOME
-}
-```
-
-To check only this Python's site-packages, omit the directory argument. You can also name additional folders after `$HOME`.
-
-## What a result means
-
-The check looks for published file names and fingerprints, affected package versions, wheel fingerprints, and supported lock-file pins. It lists executable `.pth` lines for review. The indicators cover known files and versions, so they cannot establish that a system is clean.
-
-No finding is not proof of no compromise.
 
 ## Sources
 
