@@ -2,15 +2,15 @@
 
 Checks Python folders for published indicators of the agent-framework credential stealer.
 
-## About
+## About SDS
 
-**Secure Data Solutions (SDS)**, https://sdsitgroup.com
+**Security, AI & Systems Engineering**
 
-Secure Data Solutions (SDS) is a network and firewall security company. We are the engineering team other security teams call when it has to work.
+Secure Data Solutions helps businesses strengthen their security and put AI to work. We engineer the systems and workflows that reduce repetitive work, help teams understand and respond to threats, and turn security findings into verified improvements.
 
-Our programs cover threat exposure, defensible security, and validated resilience: we find what attackers can reach, shut it down, and prove it holds. We also publish free checks like this one for cyber defenders.
+We publish SDS Rapid Checks as free, focused tools to help the community investigate specific risks and understand what needs attention. Each check states what it looks for, how to run it, and what its results can and cannot tell you.
 
-Start with one fixed-scope check, or see [all services and pricing](https://sdsitgroup.com/services/). [Discuss your project](https://sdsitgroup.com/contact).
+[Discuss your project](https://sdsitgroup.com/contact) · [Explore our services](https://sdsitgroup.com/services/)
 
 Ran this and found something, or not sure what you're looking at? [Contact us](https://sdsitgroup.com/contact). We're happy to talk it through, and when it's urgent, we pick up.
 
