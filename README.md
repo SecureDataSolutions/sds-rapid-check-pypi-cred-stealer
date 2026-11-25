@@ -20,7 +20,7 @@ Requires Python 3.8 or later. Use a trusted Python installation. Keep `-I -B -S`
 
 ## How to run
 
-The script always scans the site-packages of the Python that runs it, then walks the folders you name (or `.` for the current folder). It stops at each `site-packages` or `dist-packages` folder it finds, and skips only `.git` and `node_modules`. If you run it from `~/.ssh` and pass `.`, it only walks that folder — not your whole home directory.
+The script always scans the site-packages of the Python that runs it, then walks only the additional folders you name. Pass `.` to walk the current folder; omit directory arguments to check only this Python's site-packages. It stops at each `site-packages` or `dist-packages` folder it finds, and skips only `.git` and `node_modules`. If you run it from `~/.ssh` and pass `.`, it only walks that folder — not your whole home directory.
 
 ### 1. Go to your home folder
 
@@ -80,7 +80,7 @@ Do not pass a whole conda or Anaconda root. The `pkgs/` cache will inflate the c
 
 ### 5. How long it takes
 
-A scan of a typical home folder takes about 12 minutes. Cloud or phone mounts can make it slower. Smaller folders finish much faster.
+Runtime depends on the number of folders and files, permissions, and storage speed. Cloud or phone mounts can make it slower. Start with the specific folders you need to check.
 
 ### 6. How to read the output
 
